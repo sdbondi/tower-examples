@@ -81,23 +81,24 @@ impl<S> Layer<S> for RepeatLayer<S> {
 }
 
 fn main() {
-    let addr = "127.0.0.1:9999".parse().unwrap();
-
-    let mut connect_svc = tower_util::service_fn(|&req| {
-        TcpStream::connect(&req).and_then(|mut conn| {
+    let mut connect_svc = tower_util::service_fn(|&addr| {
+        TcpStream::connect(&addr).and_then(|mut conn| {
             conn.write(b"HELLO");
             futures::future::ok(())
         })
     });
 
+    // Flood with 4000 connections
     let mut flood_svc = ServiceBuilder::new()
         .layer(RepeatLayer::new(4000))
         .service(connect_svc);
 
+    // Call the flood service
+    let addr = "127.0.0.1:9999".parse().unwrap();
     let flooder = flood_svc
         .call(&addr)
         .and_then(|res| {
-            println!("got {}", res.len());
+            println!("Made {} connections", res.len());
             Ok(())
         })
         .map_err(|err| ());
