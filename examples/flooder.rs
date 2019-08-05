@@ -1,34 +1,12 @@
-#[macro_use]
-extern crate futures;
-
-use bytes::BytesMut;
-use futures::future::FutureResult;
 use futures::future::JoinAll;
-use futures::{Async, Future, IntoFuture, Poll};
-use std::io::{self, repeat, Read, Write};
+use futures::{Future, Poll};
+use std::io::Write;
 use std::iter::repeat_with;
 use std::marker::PhantomData;
-use std::net::SocketAddr;
-use tokio::codec::BytesCodec;
-use tokio::net::{TcpListener, TcpStream};
-use tokio::prelude::AsyncRead;
-use tokio::sync::mpsc;
-use tokio::sync::oneshot;
-use tower::{ServiceBuilder, ServiceExt};
+use tokio::net::TcpStream;
+use tower::ServiceBuilder;
 use tower_layer::Layer;
 use tower_service::Service;
-
-struct Message<TFuture> {
-    resp_tx: oneshot::Sender<TFuture>,
-}
-
-struct Worker<S, TRequest>
-where
-    S: Service<TRequest>,
-{
-    service: S,
-    rx: mpsc::Receiver<Message<S::Future>>,
-}
 
 struct RepeatService<S> {
     n: usize,
@@ -81,11 +59,8 @@ impl<S> Layer<S> for RepeatLayer<S> {
 }
 
 fn main() {
-    let mut connect_svc = tower_util::service_fn(|&addr| {
-        TcpStream::connect(&addr).and_then(|mut conn| {
-            conn.write(b"HELLO");
-            futures::future::ok(())
-        })
+    let connect_svc = tower_util::service_fn(|&addr| {
+        TcpStream::connect(&addr).and_then(|mut conn| futures::future::result(conn.write(b"HELLO")))
     });
 
     // Flood with 4000 connections
@@ -101,7 +76,10 @@ fn main() {
             println!("Made {} connections", res.len());
             Ok(())
         })
-        .map_err(|err| ());
+        .map_err(|err| {
+            println!("Got err {:?}", err);
+            ()
+        });
 
     tokio::run(flooder);
 }

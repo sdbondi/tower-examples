@@ -4,10 +4,10 @@ extern crate futures;
 use bytes::BytesMut;
 use futures::Future;
 use futures::{Async, Poll, Stream};
+use std::io;
 use tokio::codec::BytesCodec;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::AsyncRead;
-use std::io;
 
 struct Handler {
     socket: TcpStream,
